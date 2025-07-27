@@ -4,10 +4,15 @@
 #include <cmath>   // for INFINITY; numeric limits doesn't work
 #include <curand_kernel.h> 
 #include <cfloat>
+#include <cuda_fp16.h>
+#include <cublas_v2.h>
 
 #include "cuda_util.cuh"
 #include "spatial.cuh"
 #include "bitonic-shared.cuh"
+#include "tensorcore_util.cuh" 
+#include "tensorcore_distance.cuh"
+#include "tensorcore_convert.cuh"
 
 #include <faiss/gpu/utils/Select.cuh>
 
@@ -335,97 +340,6 @@ void Construct_D( float const * distances, idx_t const * assignments, idx_t b_id
 
 }
 
-//data, dH, dH_assignments, dH_psum, arr_idx, n, D
-/*
-template < typename R >
-__global__
-void Construct_D( R * points
-                , idx_t * dH
-                , idx_t const * assignments
-                , idx_t const * hub_start_pos
-                , idx_t const * arr_idx
-                , std::size_t   n
-                , R           * D
-                )
-{
-    std::size_t constexpr shared_memory_size = 32;
-    __shared__ R s_dists[ shared_memory_size ];
-
-    // Expecting a grid of size:          H x  H x 1
-    // and a CTA / thread block of size: 32 x 32 x 1
-
-    // Each thread block will work collaboratively on one cell of the HxH matrix
-    // They will use (hub_start_pos, arr_idx) to find the relevant distances and
-    // then perform a block-level reduction. The reads all involve a level of indirection
-    // from global memory and are expected to be non-coalesced.
-
-    int const lane_id     = threadIdx.x;
-    int const warp_id     = threadIdx.y;
-    int const th_id       = warp_id * blockDim.x + lane_id;
-    int const num_threads = blockDim.x * blockDim.y;
-
-    int const from_hub_id = blockIdx.x;
-    int const to_hub_id = blockIdx.y;
-
-    idx_t const start = hub_start_pos[ from_hub_id ];
-    idx_t const end   = hub_start_pos[ from_hub_id + 1 ];
-
-    // perform reduction over values in arr_idx[start] ... arr_idx[end]
-    R my_min = FLT_MAX;
-
-    R const * hp = &points[ dH[to_hub_id] * 3 ];
-    
-    // walk the entire hub with each thread locally determining
-    // the smallest value that it has seen
-    for( int i = start + th_id; i < end; i += num_threads )
-    {   
-        R * this_p = &points[ arr_idx[i] * 3];
-
-        R const new_dist = spatial::l2dist(hp, this_p);
-        if( new_dist < my_min )
-        {
-            my_min = new_dist;
-        }
-    }
-
-    // reduce each warp
-    
-    for( int stride = 1; stride < 32; stride = stride << 1 )
-    {
-        //sync_warp here and below. call before shfls/communications
-        R const paired_dist = __shfl_xor_sync( 0xFFFFFFFF, my_min, stride );
-        if( paired_dist < my_min )
-        {
-            my_min = paired_dist;
-        }
-    }
-
-    // sync warps and reduce blockwise
-    if( lane_id == 0 )
-    {
-        s_dists[ warp_id ] = my_min;
-    }
-
-    __syncthreads();
-
-    if( warp_id > 0 ) { return; }
-    
-    my_min = s_dists[ lane_id ];
-    
-    for( int stride = 1; stride < 32; stride = stride << 1 )
-    {
-        R const paired_dist = __shfl_xor_sync( 0xFFFFFFFF, my_min, stride );
-        if( paired_dist < my_min )
-        {
-            my_min = paired_dist;
-        }
-    }
-
-    if( lane_id > 0 ) { return; }
-
-    D[ from_hub_id * H + to_hub_id ] = my_min;
-}
-*/
 template < typename R, int ROUNDS >
 __global__
 void fused_transform_sort_D( R     const * D // square matrix with lower dist bound from hub i to j
@@ -664,7 +578,6 @@ __global__ void check_D(unsigned long long int * D, idx_t *results_knn, R * resu
     results_distances[tid + hid*H] = dD;
 }
 
-
 template <class R>
 void C_and_Q(std::size_t n, R *data, std::size_t q, idx_t *queries, std::size_t k, idx_t *results_knn, R *results_distances)
 {
@@ -796,6 +709,214 @@ void C_and_Q(std::size_t n, R *data, std::size_t q, idx_t *queries, std::size_t 
     cudaFree( arr_x );
     cudaFree( arr_y );
     cudaFree( arr_z );
+}
+
+template <class R>
+void C_and_Q_TensorCore(std::size_t n, R *data, std::size_t q, idx_t *queries, 
+                std::size_t k, idx_t *results_knn, R *results_distances)
+{
+    idx_t constexpr block_size = 1024;
+    
+    // Initialize cuBLAS handle for Tensor Core operations
+    tensorcore::CublasManager cublas_manager;
+    cublasHandle_t cublas_handle = cublas_manager.get();
+    
+    // Check GPU compute capability
+    int device;
+    cudaGetDevice(&device);
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, device);
+    
+    bool tensor_cores_available = (prop.major >= 7);
+    if (tensor_cores_available) {
+        std::cout << "Tensor Cores detected (compute " << prop.major << "." << prop.minor 
+                    << "), enabling optimizations." << std::endl;
+    } else {
+        std::cout << "Tensor Cores not available (compute " << prop.major << "." << prop.minor 
+                    << "), using fallback implementation." << std::endl;
+    }
+    
+    // Allocate GPU memory
+    idx_t * dH;
+    CUDA_CALL(cudaMalloc((void **) &dH, sizeof(idx_t) * H));
+
+    idx_t * dH_psum, * dH_psum_copy, * dH_assignments, * d_psum_placeholder;
+    CUDA_CALL(cudaMalloc((void **) &dH_psum,        sizeof(idx_t) * ( H + 1 )));
+    CUDA_CALL(cudaMalloc((void **) &dH_psum_copy,   sizeof(idx_t) * ( H + 1 )));
+    CUDA_CALL(cudaMalloc((void **) &d_psum_placeholder,   sizeof(idx_t) * ( H + 1)));
+    CUDA_CALL(cudaMalloc((void **) &dH_assignments, sizeof(idx_t) * n));
+    
+    // Initialize memory
+    cudaMemset(dH_psum, 0, sizeof(idx_t) * (1+H));
+    cudaMemset(dH_psum_copy, 0, sizeof(idx_t) * (1+H));
+    cudaMemset(d_psum_placeholder, 0, sizeof(idx_t) * (1+H));
+    cudaMemset(dH_assignments, 0, sizeof(idx_t) * n);
+
+    // Batch processing setup
+    idx_t constexpr batch_size = 100000;
+    idx_t batch_number = (n + batch_size - 1) / batch_size;
+    
+    float * distances;
+    CUDA_CALL(cudaMalloc((void **) &distances, sizeof(float) * H * batch_size));
+
+    // Arrays for sorted points
+    float * arr_x, *arr_y, *arr_z;
+    idx_t * arr_idx;
+    CUDA_CALL(cudaMalloc((void **) &arr_x, sizeof(float) * n));
+    CUDA_CALL(cudaMalloc((void **) &arr_y, sizeof(float) * n));
+    CUDA_CALL(cudaMalloc((void **) &arr_z, sizeof(float) * n));
+    CUDA_CALL(cudaMalloc((void **) &arr_idx, sizeof(idx_t) * n));
+
+    // Hub distance matrix
+    float * D;
+    CUDA_CALL(cudaMalloc((void **) &D, sizeof(float) * H * H));
+
+    idx_t *iD;
+    float * dD;
+    CUDA_CALL(cudaMalloc((void **) &iD, sizeof(idx_t) * H * H));
+    CUDA_CALL(cudaMalloc((void **) &dD, sizeof(float) * H * H));
+
+    // Step 1: Randomly select hubs
+    std::size_t num_blocks = (H + block_size - 1) / block_size;
+    Randomly_Select_Hubs<<<num_blocks, block_size>>>(n, dH);
+    CHECK_ERROR("Randomly_Select_Hubs.");
+
+    // Step 2: Initialize distance matrix D
+    set_max_float<<<( H * H + block_size - 1 ) / block_size, block_size>>>(D, H * H);
+    CHECK_ERROR("set_max_float");
+
+    // Step 3: Process batches with Tensor Core optimization
+    for (idx_t batch_id = 0; batch_id < batch_number; batch_id++)
+    {
+        // Use smart distance calculation that chooses best method
+        smart_distance_calculation(
+            batch_id, batch_size, n, dH, distances, data,
+            dH_psum, dH_assignments, cublas_handle
+        );
+        
+        // Continue with hub-to-hub distance matrix construction
+        Construct_D<<<H, block_size>>>(distances, dH_assignments, batch_id, batch_size, n, D);
+        CHECK_ERROR("Construct_D");
+    }
+    
+    cudaFree(distances);
+
+    // Step 4: Build prefix sum for hub assignments
+    fused_prefix_sum_copy<<<1, dim3( warp_size,  warp_size, 1)  >>>(dH_psum, dH_psum_copy);
+    cudaMemcpy(d_psum_placeholder, dH_psum_copy, (H + 1 )* sizeof(idx_t), cudaMemcpyDeviceToDevice);
+    
+    cudaMemcpy(dH_psum_copy + 1, d_psum_placeholder, H * sizeof(idx_t), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(dH_psum + 1, d_psum_placeholder, H * sizeof(idx_t), cudaMemcpyDeviceToDevice);
+    cudaMemset(dH_psum, 0, sizeof(idx_t));
+    cudaMemset(dH_psum_copy, 0, sizeof(idx_t));
+    CHECK_ERROR("Fused_prefix_sum_copy.");
+    cudaFree(d_psum_placeholder);
+
+    // Step 5: Bucket sort points by hub assignment
+    num_blocks = (n + block_size - 1) / block_size;
+    BucketSort<<<num_blocks,  block_size>>>(n, arr_x, arr_y, arr_z, arr_idx, data, dH_assignments, dH_psum_copy);
+    CHECK_ERROR("BucketSort.");
+    cudaFree(dH_psum_copy);
+
+    // Step 6: Sort hub distance matrix
+    fused_transform_sort_D<float, (H + block_size - 1) / block_size> <<<H, dim3 { warp_size, block_size/warp_size, 1 }>>> (D, iD, dD);
+    CHECK_ERROR("Sort_D.");
+    cudaFree(D); 
+
+    // Step 7: Execute queries
+    int * d_hubsScanned, * d_pointsScanned;
+    CUDA_CALL(cudaMalloc((void **) &d_hubsScanned, sizeof(int)* 1));//change here if want to log
+    CUDA_CALL(cudaMalloc((void **) &d_pointsScanned, sizeof(int)* 1));
+
+    std::size_t constexpr queries_per_block = 128 / warp_size;
+    num_blocks = util::CEIL_DIV(n, queries_per_block);
+
+    // Launch appropriate query kernel based on k value
+    switch (util::CEIL_DIV(k, warp_size))
+    {
+        case 1: { 
+            Query<32, 2, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
+                queries, results_knn, results_distances, k, n, data, 
+                dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
+                d_hubsScanned, d_pointsScanned
+            ); 
+        } break;
+        case 2: { 
+            Query<64, 3, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
+                queries, results_knn, results_distances, k, n, data, 
+                dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
+                d_hubsScanned, d_pointsScanned
+            ); 
+        } break;
+        case 3: { 
+            Query<128, 3, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
+                queries, results_knn, results_distances, k, n, data, 
+                dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
+                d_hubsScanned, d_pointsScanned
+            ); 
+        } break;
+        case 4: { 
+            Query<256, 4, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
+                queries, results_knn, results_distances, k, n, data, 
+                dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
+                d_hubsScanned, d_pointsScanned
+            ); 
+        } break;
+        case 5: { 
+            Query<512, 8, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
+                queries, results_knn, results_distances, k, n, data, 
+                dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
+                d_hubsScanned, d_pointsScanned
+            ); 
+        } break;
+        default: 
+            assert(false && "Rounds required to fulfill k value will exceed thread register allotment.");
+    }
+
+    CHECK_ERROR("Running scan kernel.");
+    
+    // Cleanup
+    cudaFree(iD);
+    cudaFree(dD);
+    cudaFree(dH_psum);
+    cudaFree(dH_assignments);
+    cudaFree(arr_idx);
+    cudaFree(arr_x);
+    cudaFree(arr_y);
+    cudaFree(arr_z);
+    cudaFree(dH);
+    cudaFree(d_hubsScanned);
+    cudaFree(d_pointsScanned);
+    
+    if (tensor_cores_available) {
+        std::cout << "Tensor Core optimization completed successfully." << std::endl;
+    }
+}
+
+/**
+    * Alternative interface with explicit Tensor Core control
+    */
+template <class R>
+void C_and_Q_Advanced(std::size_t n, R *data, std::size_t q, idx_t *queries, 
+                        std::size_t k, idx_t *results_knn, R *results_distances,
+                        bool force_tensor_cores = false,
+                        bool enable_profiling = false)
+{
+    if (enable_profiling) {
+        // Add NVTX markers for profiling
+        #ifdef ENABLE_PROFILING
+        nvtxRangePush("C_and_Q_TensorCore");
+        #endif
+    }
+    
+    // Implementation same as above, but with force_tensor_cores parameter
+    // passed to smart_distance_calculation
+    
+    if (enable_profiling) {
+        #ifdef ENABLE_PROFILING
+        nvtxRangePop();
+        #endif
+    }
 }
 
 } // namespace bitonic

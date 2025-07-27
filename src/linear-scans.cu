@@ -112,7 +112,15 @@ auto dispatch_knn(const R (&data)[N][D], const idx_t (&queries)[Q], Algorithm al
             assert( false && "Compiled without faiss support.");
 #endif
             break;
-
+            
+            // Add new algorithm option:
+            case Algorithm::hubs_ws_tc:  // New enum value
+#ifdef USE_FAISS
+                bitonic_hubs_ws::C_and_Q_TensorCore(N, dV, Q, dQ, k,
+                                    thrust::raw_pointer_cast(d_knn.data()),
+                                    thrust::raw_pointer_cast(d_distances.data()));
+#endif
+                break;
         case Algorithm::faiss:
 #ifdef USE_FAISS
             assert(N == Q);
