@@ -34,6 +34,7 @@ enum class Algorithm
     warpwise, /** A warp-ballot-based insertion sort that adds one point at a time*/
     hubs,     /** A spatio-graph-based approach that builds an index with hubs and lower bounds */
     hubs_ws,  /** A spatio-graph-based approach that builds an index with hubs and lower bounds w/ WarpSelect */
+    hubs_ws_tc, /** A spatio-graph-based approach that builds an index with hubs and lower bounds w/ TensorCore support */
     faiss,    /** The linear-scan method from Facebook/Meta Research */
     faiss_ws, /** The linear-scan method from Facebook/Meta Research using WarpSelect*/
     faiss_bs, /** The linear-scan method from Facebook/Meta Research using BlockSelect*/
