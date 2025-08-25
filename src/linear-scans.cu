@@ -34,7 +34,6 @@ enum class Algorithm
     warpwise, /** A warp-ballot-based insertion sort that adds one point at a time*/
     hubs,     /** A spatio-graph-based approach that builds an index with hubs and lower bounds */
     hubs_ws,  /** A spatio-graph-based approach that builds an index with hubs and lower bounds w/ WarpSelect */
-    hubs_ws_tc, /** A spatio-graph-based approach that builds an index with hubs and lower bounds w/ TensorCore support */
     faiss,    /** The linear-scan method from Facebook/Meta Research */
     faiss_ws, /** The linear-scan method from Facebook/Meta Research using WarpSelect*/
     faiss_bs, /** The linear-scan method from Facebook/Meta Research using BlockSelect*/
@@ -113,15 +112,7 @@ auto dispatch_knn(const R (&data)[N][D], const idx_t (&queries)[Q], Algorithm al
             assert( false && "Compiled without faiss support.");
 #endif
             break;
-            
-            // Add new algorithm option:
-            case Algorithm::hubs_ws_tc:  // New enum value
-#ifdef USE_FAISS
-                bitonic_hubs_ws::C_and_Q_TensorCore(N, dV, Q, dQ, k,
-                                    thrust::raw_pointer_cast(d_knn.data()),
-                                    thrust::raw_pointer_cast(d_distances.data()));
-#endif
-                break;
+
         case Algorithm::faiss:
 #ifdef USE_FAISS
             assert(N == Q);
