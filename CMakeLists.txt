@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.27)
+set(CMAKE_CUDA_ARCHITECTURES "86")
 project(gpu-knn LANGUAGES CUDA CXX)
 
 file(GLOB CU_FILES
@@ -21,7 +22,7 @@ if(LINK_FAISS)
 endif()
 
 target_compile_options(linear-scans PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
-                        -arch=sm_89;
+                        -arch=sm_86;
                         -std=c++20;
                         -Xptxas="-v";
                        >)
