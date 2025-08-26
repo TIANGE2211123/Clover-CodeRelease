@@ -17,6 +17,7 @@
 #include "cpu-brute-force.cuh"
 #include "warp-wise.cuh"
 #include "treelogy_kdtree.cuh"
+#include "cagra.cuh"
 
 #ifdef USE_FAISS  
     #include "faiss-brute-force.cuh"
@@ -38,6 +39,7 @@ enum class Algorithm
     faiss_ws, /** The linear-scan method from Facebook/Meta Research using WarpSelect*/
     faiss_bs, /** The linear-scan method from Facebook/Meta Research using BlockSelect*/
     treelogy_kdtree, /*GPU version of knn search from Treelogy library*/
+    cagra,    /** CAGRA: Highly Parallel Graph Construction and Approximate Nearest Neighbor Search for GPUs */
     Count     /** A pseudo-element to hack conversions from enum to int to get the enum element count */
 };
 
@@ -49,6 +51,7 @@ const char* algorithm_descriptions[static_cast<std::size_t>(Algorithm::Count)] =
         "Faiss    -- a brute force linear scan using the faiss library",
 	"FaissWarpSelect -- a brute force linear scan using WarpSelect from the faiss library",
 	"FaissBlockSelect -- a brute force linear scan using BlockSelect from the faiss library",
+        "CAGRA    -- Highly Parallel Graph Construction and Approximate Nearest Neighbor Search for GPUs",
 };
 
 /**
@@ -151,6 +154,12 @@ auto dispatch_knn(const R (&data)[N][D], const idx_t (&queries)[Q], Algorithm al
             treelogy::treelogy_kd_tree ( N, dV, Q, dQ, k
                             , thrust::raw_pointer_cast(d_knn_treelogy.data())
                             , thrust::raw_pointer_cast(d_distances.data()) );
+        break;
+
+        case Algorithm::cagra:
+            cagra::knn_gpu ( N, dV, Q, dQ, k
+                           , thrust::raw_pointer_cast(d_knn.data())
+                           , thrust::raw_pointer_cast(d_distances.data()) );
         break;
 
         default:
@@ -270,6 +279,12 @@ auto dispatch_knn(std::vector<R>& data,  std::vector<idx_t>& queries, Algorithm 
             treelogy::treelogy_kd_tree ( N, dV, Q, dQ, k
                             , thrust::raw_pointer_cast(d_knn_treelogy.data())
                             , thrust::raw_pointer_cast(d_distances.data()) );
+        break;
+
+        case Algorithm::cagra:
+            cagra::knn_gpu ( N, dV, Q, dQ, k
+                           , thrust::raw_pointer_cast(d_knn.data())
+                           , thrust::raw_pointer_cast(d_distances.data()) );
         break;
 
         default:
