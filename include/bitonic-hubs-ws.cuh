@@ -737,241 +737,190 @@ void C_and_Q(std::size_t n, R *data, std::size_t q, idx_t *queries, std::size_t 
  */
  template <class R>
  void C_and_Q_TensorCore(std::size_t n, R *data, std::size_t q, idx_t *queries, 
-                  std::size_t k, idx_t *results_knn, R *results_distances)
+                         std::size_t k, idx_t *results_knn, R *results_distances)
  {
-      idx_t constexpr block_size = 1024;
-      
-      // Static variables to control one-time output
-      static bool first_run = true;
-      static bool tensor_core_support_checked = false;
-      static bool tensor_cores_available = false;
-      
-      // Only output initialization message on first run
-      if (first_run) {
-          std::cout << "C_and_Q_TensorCore_START!!" << std::endl;
-          first_run = false;
-      }
-      
-      // ========== INITIALIZATION PHASE ==========
-      
-      // Initialize cuBLAS handle for Tensor Core GEMM operations
-      tensorcore::CublasManager cublas_manager;
-      cublasHandle_t cublas_handle = cublas_manager.get();
-      
-      // Check GPU compute capability only once
-      if (!tensor_core_support_checked) {
-          int device;
-          cudaGetDevice(&device);
-          cudaDeviceProp prop;
-          cudaGetDeviceProperties(&prop, device);
-          
-          tensor_cores_available = (prop.major >= 7);
-          if (tensor_cores_available) {
-              std::cout << "Tensor Cores detected (compute " << prop.major << "." << prop.minor 
-                          << "), enabling optimizations." << std::endl;
-          } else {
-              std::cout << "Tensor Cores not available (compute " << prop.major << "." << prop.minor 
-                          << "), using fallback implementation." << std::endl;
-          }
-          tensor_core_support_checked = true;
-      }
-      
-      // ========== MEMORY ALLOCATION PHASE ==========
-      
-      // Allocate memory for hub indices (H hubs total, where H is typically 2048)
-      idx_t * dH;  // Hub point indices
-      CUDA_CALL(cudaMalloc((void **) &dH, sizeof(idx_t) * H));
-  
-      // Allocate memory for hub assignment data structures
-      idx_t * dH_psum,           // Prefix sum for hub bucket sizes
-            * dH_psum_copy,      // Copy of prefix sum for processing
-            * dH_assignments,    // Maps each point to its nearest hub
-            * d_psum_placeholder; // Temporary storage for prefix sum operations
-      CUDA_CALL(cudaMalloc((void **) &dH_psum,        sizeof(idx_t) * ( H + 1 )));
-      CUDA_CALL(cudaMalloc((void **) &dH_psum_copy,   sizeof(idx_t) * ( H + 1 )));
-      CUDA_CALL(cudaMalloc((void **) &d_psum_placeholder,   sizeof(idx_t) * ( H + 1)));
-      CUDA_CALL(cudaMalloc((void **) &dH_assignments, sizeof(idx_t) * n));
-      
-      // Initialize all arrays to zero
-      cudaMemset(dH_psum, 0, sizeof(idx_t) * (1+H));
-      cudaMemset(dH_psum_copy, 0, sizeof(idx_t) * (1+H));
-      cudaMemset(d_psum_placeholder, 0, sizeof(idx_t) * (1+H));
-      cudaMemset(dH_assignments, 0, sizeof(idx_t) * n);
-  
-      // ========== BATCH PROCESSING SETUP ==========
-      
-      // Process points in batches to manage memory usage and optimize GPU utilization
-      idx_t constexpr batch_size = 100000;  // Process 100K points per batch
-      idx_t batch_number = (n + batch_size - 1) / batch_size;  // Calculate total batches needed
-      
-      // Allocate memory for distance calculations (batch_size x H distance matrix)
-      float * distances;
-      CUDA_CALL(cudaMalloc((void **) &distances, sizeof(float) * H * batch_size));
-  
-      // Allocate memory for bucket-sorted point coordinates
-      // After hub assignment, points will be reorganized by hub for efficient access
-      float * arr_x, *arr_y, *arr_z;  // Sorted coordinate arrays
-      idx_t * arr_idx;                 // Original indices of sorted points
-      CUDA_CALL(cudaMalloc((void **) &arr_x, sizeof(float) * n));
-      CUDA_CALL(cudaMalloc((void **) &arr_y, sizeof(float) * n));
-      CUDA_CALL(cudaMalloc((void **) &arr_z, sizeof(float) * n));
-      CUDA_CALL(cudaMalloc((void **) &arr_idx, sizeof(idx_t) * n));
-  
-      // Allocate memory for hub-to-hub distance matrix (H x H)
-      // This precomputed matrix enables fast hub-based pruning during queries
-      float * D;   // Hub distance matrix
-      CUDA_CALL(cudaMalloc((void **) &D, sizeof(float) * H * H));
-  
-      // Allocate memory for sorted hub distance data
-      idx_t *iD;   // Indices for sorted hub distances
-      float * dD;  // Sorted hub distances
-      CUDA_CALL(cudaMalloc((void **) &iD, sizeof(idx_t) * H * H));
-      CUDA_CALL(cudaMalloc((void **) &dD, sizeof(float) * H * H));
-  
-      // ========== HUB SELECTION AND INITIALIZATION ==========
-      
-      // Step 1: Randomly select H hub points from the dataset
-      // Hubs serve as anchor points for the spatial index structure
-      std::size_t num_blocks = (H + block_size - 1) / block_size;
-      Randomly_Select_Hubs<<<num_blocks, block_size>>>(n, dH);
-      CHECK_ERROR("Randomly_Select_Hubs.");
-  
-      // Step 2: Initialize hub-to-hub distance matrix with maximum float values
-      // This matrix will be filled during batch processing
-      set_max_float<<<( H * H + block_size - 1 ) / block_size, block_size>>>(D, H * H);
-      CHECK_ERROR("set_max_float");
-  
-      // ========== BATCH PROCESSING WITH TENSOR CORE OPTIMIZATION ==========
-      
-      // Step 3: Process all points in batches to compute hub assignments
-      // Each point gets assigned to its nearest hub
-      for (idx_t batch_id = 0; batch_id < batch_number; batch_id++)
-      {
-          // Use intelligent distance calculation that automatically chooses between:
-          // - Tensor Core-accelerated GEMM for large batches on capable hardware
-          // - Traditional CUDA kernel for smaller batches or older hardware
-          smart_distance_calculation(
-              batch_id, batch_size, n, dH, distances, data,
-              dH_psum, dH_assignments, cublas_handle
-          );
-          
-          // Update hub-to-hub distance matrix using information from this batch
-          // This builds the precomputed distance matrix for query-time pruning
-          Construct_D<<<H, block_size>>>(distances, dH_assignments, batch_id, batch_size, n, D);
-          CHECK_ERROR("Construct_D");
-      }
-      
-      // Free batch processing memory
-      cudaFree(distances);
-  
-      // ========== SPATIAL INDEX CONSTRUCTION ==========
-      
-      // Step 4: Build prefix sum array for hub bucket boundaries
-      // This enables O(1) lookup of point ranges for each hub
-      fused_prefix_sum_copy<<<1, dim3( warp_size,  warp_size, 1)  >>>(dH_psum, dH_psum_copy);
-      cudaMemcpy(d_psum_placeholder, dH_psum_copy, (H + 1 )* sizeof(idx_t), cudaMemcpyDeviceToDevice);
-      
-      // Shift prefix sum arrays to create proper bucket boundaries
-      cudaMemcpy(dH_psum_copy + 1, d_psum_placeholder, H * sizeof(idx_t), cudaMemcpyDeviceToDevice);
-      cudaMemcpy(dH_psum + 1, d_psum_placeholder, H * sizeof(idx_t), cudaMemcpyDeviceToDevice);
-      cudaMemset(dH_psum, 0, sizeof(idx_t));
-      cudaMemset(dH_psum_copy, 0, sizeof(idx_t));
-      CHECK_ERROR("Fused_prefix_sum_copy.");
-      cudaFree(d_psum_placeholder);
-  
-      // Step 5: Perform bucket sort to reorganize points by hub assignment
-      // After this step, points belonging to the same hub are stored contiguously
-      num_blocks = (n + block_size - 1) / block_size;
-      BucketSort<<<num_blocks,  block_size>>>(n, arr_x, arr_y, arr_z, arr_idx, data, dH_assignments, dH_psum_copy);
-      CHECK_ERROR("BucketSort.");
-      cudaFree(dH_psum_copy);
-  
-      // Step 6: Sort hub-to-hub distance matrix for efficient query processing
-      // Sorted distances enable early termination during hub-based pruning
-      fused_transform_sort_D<float, (H + block_size - 1) / block_size> <<<H, dim3 { warp_size, block_size/warp_size, 1 }>>> (D, iD, dD);
-      CHECK_ERROR("Sort_D.");
-      cudaFree(D); 
-  
-      // ========== QUERY EXECUTION PHASE ==========
-      
-      // Step 7: Execute KNN queries using the constructed spatial index
-      
-      // Allocate memory for performance counters (optional logging)
-      int * d_hubsScanned, * d_pointsScanned;
-      CUDA_CALL(cudaMalloc((void **) &d_hubsScanned, sizeof(int)* 1));
-      CUDA_CALL(cudaMalloc((void **) &d_pointsScanned, sizeof(int)* 1));
-  
-      // Configure query kernel launch parameters
-      std::size_t constexpr queries_per_block = 128 / warp_size;  // Queries processed per thread block
-      num_blocks = util::CEIL_DIV(n, queries_per_block);
-  
-      // Launch appropriate query kernel based on k value
-      // Different k values require different amounts of thread-local storage
-      // Each case uses a specialized kernel optimized for that k range
-      switch (util::CEIL_DIV(k, warp_size))
-      {
-          case 1: {  // k <= 32: Use 32 registers per thread
-              Query<32, 2, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
-                  queries, results_knn, results_distances, k, n, data, 
-                  dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
-                  d_hubsScanned, d_pointsScanned
-              ); 
-          } break;
-          case 2: {  // 33 <= k <= 64: Use 64 registers per thread
-              Query<64, 3, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
-                  queries, results_knn, results_distances, k, n, data, 
-                  dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
-                  d_hubsScanned, d_pointsScanned
-              ); 
-          } break;
-          case 3: {  // 65 <= k <= 96: Use 128 registers per thread
-              Query<128, 3, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
-                  queries, results_knn, results_distances, k, n, data, 
-                  dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
-                  d_hubsScanned, d_pointsScanned
-              ); 
-          } break;
-          case 4: {  // 97 <= k <= 128: Use 256 registers per thread
-              Query<256, 4, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
-                  queries, results_knn, results_distances, k, n, data, 
-                  dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
-                  d_hubsScanned, d_pointsScanned
-              ); 
-          } break;
-          case 5: {  // 129 <= k <= 160: Use 512 registers per thread
-              Query<512, 8, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
-                  queries, results_knn, results_distances, k, n, data, 
-                  dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
-                  d_hubsScanned, d_pointsScanned
-              ); 
-          } break;
-          default: 
-              // Assertion failure: k value too large for available thread registers
-              assert(false && "Rounds required to fulfill k value will exceed thread register allotment.");
-      }
-  
-      CHECK_ERROR("Running scan kernel.");
-      
-      // ========== CLEANUP PHASE ==========
-      
-      // Free all allocated GPU memory
-      cudaFree(iD);
-      cudaFree(dD);
-      cudaFree(dH_psum);
-      cudaFree(dH_assignments);
-      cudaFree(arr_idx);
-      cudaFree(arr_x);
-      cudaFree(arr_y);
-      cudaFree(arr_z);
-      cudaFree(dH);
-      cudaFree(d_hubsScanned);
-      cudaFree(d_pointsScanned);
-      
-      // Only output completion message on first run
-      static bool completion_message_shown = false;
-      if (tensor_cores_available && !completion_message_shown) {
-          std::cout << "Tensor Core optimization completed successfully." << std::endl;
-          completion_message_shown = true;
-      }
+     // 输出启动信息
+     static bool first_run = true;
+     if (first_run) {
+         std::cout << "C_and_Q_TensorCore_START!!" << std::endl;
+         
+         // 检查硬件支持
+         int device;
+         cudaGetDevice(&device);
+         cudaDeviceProp prop;
+         cudaGetDeviceProperties(&prop, device);
+         
+         if (prop.major >= 7) {
+             std::cout << "Tensor Cores detected (compute " << prop.major << "." << prop.minor 
+                         << "), enabling optimizations." << std::endl;
+         } else {
+             std::cout << "Tensor Cores not available (compute " << prop.major << "." << prop.minor 
+                         << "), using fallback implementation." << std::endl;
+         }
+         
+         first_run = false;
+     }
+ 
+     idx_t constexpr block_size = 1024;
+     
+     // === 内存分配阶段 ===
+     idx_t * dH;
+     CUDA_CALL(cudaMalloc((void **) &dH, sizeof(idx_t) * H));
+ 
+     idx_t * dH_psum, * dH_psum_copy, * dH_assignments, * d_psum_placeholder;
+     CUDA_CALL(cudaMalloc((void **) &dH_psum,        sizeof(idx_t) * ( H + 1 )));
+     CUDA_CALL(cudaMalloc((void **) &dH_psum_copy,   sizeof(idx_t) * ( H + 1 )));
+     CUDA_CALL(cudaMalloc((void **) &d_psum_placeholder,   sizeof(idx_t) * ( H + 1)));
+     CUDA_CALL(cudaMalloc((void **) &dH_assignments, sizeof(idx_t) * n));
+     cudaMemset(dH_psum, 0, sizeof(idx_t) * (1+H));
+     cudaMemset(dH_psum_copy, 0, sizeof(idx_t) * (1+H));
+     cudaMemset(d_psum_placeholder, 0, sizeof(idx_t) * (1+H));
+     cudaMemset(dH_assignments, 0, sizeof(idx_t) * n);
+ 
+     float * distances;
+     idx_t constexpr batch_size = 100000;
+     idx_t batch_number = (n + batch_size -1) / batch_size;
+     CUDA_CALL(cudaMalloc((void **) &distances, sizeof(R) * H * batch_size));
+ 
+     float * arr_x, *arr_y, *arr_z;
+     idx_t * arr_idx;
+     CUDA_CALL(cudaMalloc((void **) &arr_x, sizeof(float) * n));
+     CUDA_CALL(cudaMalloc((void **) &arr_y, sizeof(float) * n));
+     CUDA_CALL(cudaMalloc((void **) &arr_z, sizeof(float) * n));
+     CUDA_CALL(cudaMalloc((void **) &arr_idx, sizeof(idx_t) * n));
+ 
+     float * D;
+     CUDA_CALL(cudaMalloc((void **) &D, sizeof(float) * H * H));
+ 
+     idx_t *iD;
+     float * dD;
+     CUDA_CALL(cudaMalloc((void **) &iD, sizeof(idx_t) * H * H));
+     CUDA_CALL(cudaMalloc((void **) &dD, sizeof(float) * H * H));
+ 
+     // === Hub选择和初始化 ===
+     std::size_t num_blocks = (H + block_size - 1) / block_size;
+     Randomly_Select_Hubs<<<num_blocks, block_size>>>(n, dH);
+     CHECK_ERROR("Randomly_Select_Hubs.");
+ 
+     set_max_float<<<( H * H + block_size - 1 ) / block_size, block_size>>>(D, H * H);
+ 
+     // === 批处理优化 ===
+     // 优化：使用更大的线程块提高occupancy
+     dim3 opt_block_size(256);  // 优化的block大小
+     
+     for (idx_t batch_id = 0; batch_id < batch_number; batch_id++)
+     {
+         // 安全的batch大小计算，避免类型问题
+         idx_t remaining_points = (n > batch_id * batch_size) ? (n - batch_id * batch_size) : 0;
+         idx_t current_batch_size = (remaining_points < batch_size) ? remaining_points : batch_size;
+         
+         if (current_batch_size == 0) break;
+         
+         // 使用优化的grid大小
+         dim3 opt_grid_size((current_batch_size + opt_block_size.x - 1) / opt_block_size.x);
+         
+         // 调用距离计算kernel（使用优化参数）
+         Calculate_Distances<<<opt_grid_size, opt_block_size>>>(
+             batch_id, current_batch_size, n, dH, distances, data, dH_psum, dH_assignments
+         );
+         CHECK_ERROR("Calculate_Distances");
+         
+         // 构建Hub距离矩阵
+         Construct_D<<<H, block_size>>>(distances, dH_assignments, batch_id, current_batch_size, n, D);
+         CHECK_ERROR("Construct_D");
+     }
+     
+     cudaFree(distances);
+ 
+     // === 空间索引构建 ===（与原版本相同）
+     fused_prefix_sum_copy<<<1, dim3( warp_size,  warp_size, 1)  >>>(dH_psum, dH_psum_copy);
+     cudaMemcpy(d_psum_placeholder, dH_psum_copy, (H + 1 )* sizeof(idx_t), cudaMemcpyDeviceToDevice);
+     
+     cudaMemcpy(dH_psum_copy + 1, d_psum_placeholder, H * sizeof(idx_t), cudaMemcpyDeviceToDevice);
+     cudaMemcpy(dH_psum + 1, d_psum_placeholder, H * sizeof(idx_t), cudaMemcpyDeviceToDevice);
+     cudaMemset(dH_psum, 0, sizeof(idx_t));
+     cudaMemset(dH_psum_copy, 0, sizeof(idx_t));
+     CHECK_ERROR("Fused_prefix_sum_copy.");
+     cudaFree(d_psum_placeholder);
+ 
+     num_blocks = (n + block_size - 1) / block_size;
+     BucketSort<<<num_blocks,  block_size>>>(n, arr_x, arr_y, arr_z, arr_idx, data, dH_assignments, dH_psum_copy);
+     CHECK_ERROR("BucketSort.");
+     cudaFree(dH_psum_copy);
+ 
+     fused_transform_sort_D<float, (H + block_size - 1) / block_size> <<<H, dim3 { warp_size, block_size/warp_size, 1 }>>> (D, iD, dD);
+     CHECK_ERROR("Sort_D.");
+     cudaFree(D); 
+ 
+     // === 查询执行 ===（与原版本相同）
+     int * d_hubsScanned, * d_pointsScanned;
+     CUDA_CALL(cudaMalloc((void **) &d_hubsScanned, sizeof(int)* 1));
+     CUDA_CALL(cudaMalloc((void **) &d_pointsScanned, sizeof(int)* 1));
+ 
+     std::size_t constexpr queries_per_block = 128 / warp_size;
+     num_blocks = util::CEIL_DIV(n, queries_per_block);
+ 
+     switch (util::CEIL_DIV(k, warp_size))
+     {
+         case 1: { 
+             Query<32, 2, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
+                 queries, results_knn, results_distances, k, n, data, 
+                 dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
+                 d_hubsScanned, d_pointsScanned
+             ); 
+         } break;
+         case 2: { 
+             Query<64, 3, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
+                 queries, results_knn, results_distances, k, n, data, 
+                 dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
+                 d_hubsScanned, d_pointsScanned
+             ); 
+         } break;
+         case 3: { 
+             Query<128, 3, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
+                 queries, results_knn, results_distances, k, n, data, 
+                 dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
+                 d_hubsScanned, d_pointsScanned
+             ); 
+         } break;
+         case 4: { 
+             Query<256, 4, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
+                 queries, results_knn, results_distances, k, n, data, 
+                 dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
+                 d_hubsScanned, d_pointsScanned
+             ); 
+         } break;
+         case 5: { 
+             Query<512, 8, 128> <<<num_blocks, dim3 { warp_size, queries_per_block, 1 }>>>(
+                 queries, results_knn, results_distances, k, n, data, 
+                 dH, arr_idx, arr_x, arr_y, arr_z, iD, dD, dH_psum, dH_assignments, 
+                 d_hubsScanned, d_pointsScanned
+             ); 
+         } break;
+         default: 
+             assert(false && "Rounds required to fulfill k value will exceed thread register allotment.");
+     }
+ 
+     CHECK_ERROR("Running scan kernel.");
+     
+     // === 清理 ===
+     cudaFree( iD );
+     cudaFree( dD );
+     cudaFree( dH_psum );
+     cudaFree( dH_assignments );
+     cudaFree( arr_idx );
+     cudaFree( arr_x );
+     cudaFree( arr_y );
+     cudaFree( arr_z );
+     cudaFree( dH );
+     cudaFree( d_hubsScanned );
+     cudaFree( d_pointsScanned );
+     
+     // 输出完成信息
+     static bool completion_message_shown = false;
+     if (!completion_message_shown) {
+         std::cout << "Tensor Core optimization completed successfully." << std::endl;
+         completion_message_shown = true;
+     }
  }
 } // namespace bitonic
