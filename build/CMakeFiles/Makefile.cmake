@@ -7,7 +7,7 @@ set(CMAKE_DEPENDS_GENERATOR "Unix Makefiles")
 # The top level Makefile was generated from the following files:
 set(CMAKE_MAKEFILE_DEPENDS
   "CMakeCache.txt"
-  "/root/autodl-tmp/Clover-CodeRelease/CMakeLists.txt"
+  "/root/autodl-tmp/Clover-CodeRelease-main/CMakeLists.txt"
   "CMakeFiles/4.0.3/CMakeCUDACompiler.cmake"
   "CMakeFiles/4.0.3/CMakeCXXCompiler.cmake"
   "CMakeFiles/4.0.3/CMakeSystem.cmake"
@@ -99,6 +99,9 @@ set(CMAKE_MAKEFILE_DEPENDS
   "/root/miniconda3/share/cmake-4.0/Modules/Compiler/XLClang-CXX-DetermineCompiler.cmake"
   "/root/miniconda3/share/cmake-4.0/Modules/Compiler/zOS-C-DetermineCompiler.cmake"
   "/root/miniconda3/share/cmake-4.0/Modules/Compiler/zOS-CXX-DetermineCompiler.cmake"
+  "/root/miniconda3/share/cmake-4.0/Modules/FindOpenMP.cmake"
+  "/root/miniconda3/share/cmake-4.0/Modules/FindPackageHandleStandardArgs.cmake"
+  "/root/miniconda3/share/cmake-4.0/Modules/FindPackageMessage.cmake"
   "/root/miniconda3/share/cmake-4.0/Modules/Internal/CMakeCUDAArchitecturesAll.cmake"
   "/root/miniconda3/share/cmake-4.0/Modules/Internal/CMakeCUDAArchitecturesNative.cmake"
   "/root/miniconda3/share/cmake-4.0/Modules/Internal/CMakeCUDAArchitecturesValidate.cmake"

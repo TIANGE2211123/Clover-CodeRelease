@@ -1,7 +1,7 @@
 {
 	"InstallScripts" : 
 	[
-		"/root/autodl-tmp/Clover-CodeRelease/build/cmake_install.cmake"
+		"/root/autodl-tmp/Clover-CodeRelease-main/build/cmake_install.cmake"
 	],
 	"Parallel" : false
 }

@@ -17,6 +17,7 @@
 #include "cpu-brute-force.cuh"
 #include "warp-wise.cuh"
 #include "treelogy_kdtree.cuh"
+#include "tensorcore_distance.cuh"
 
 #ifdef USE_FAISS  
     #include "faiss-brute-force.cuh"
@@ -47,6 +48,7 @@ const char* algorithm_descriptions[static_cast<std::size_t>(Algorithm::Count)] =
         "Warpwise -- a linear scan that uses warp balloting to update a priority queue",
         "Hubs     -- a spatio-graph index-based approach that integrates Bitonic as a scan primitive",
         "HubsWS   -- a spatio-graph index-based approach that integrates Bitonic as a scan primitive w/ ws",
+        "HubsWS_TC -- a spatio-graph index-based approach with Tensor Core optimization",  // add this
         "Faiss    -- a brute force linear scan using the faiss library",
 	"FaissWarpSelect -- a brute force linear scan using WarpSelect from the faiss library",
 	"FaissBlockSelect -- a brute force linear scan using BlockSelect from the faiss library",
@@ -120,8 +122,12 @@ auto dispatch_knn(const R (&data)[N][D], const idx_t (&queries)[Q], Algorithm al
                 bitonic_hubs_ws::C_and_Q_TensorCore(N, dV, Q, dQ, k,
                                     thrust::raw_pointer_cast(d_knn.data()),
                                     thrust::raw_pointer_cast(d_distances.data()));
+#else
+                std::cerr << "Requested algorithm HubsWS_TC but compiled without FAISS support" << std::endl;
+                assert( false && "Compiled without faiss support.");
 #endif
-                break;
+            break;
+
         case Algorithm::faiss:
 #ifdef USE_FAISS
             assert(N == Q);
@@ -236,6 +242,17 @@ auto dispatch_knn(std::vector<R>& data,  std::vector<idx_t>& queries, Algorithm 
                             , thrust::raw_pointer_cast(d_distances.data()) );
 #else
             std::cerr << "Requested algorithm HubsWS but compiled without FAISS support" << std::endl;
+            assert( false && "Compiled without faiss support.");
+#endif
+            break;
+
+        case Algorithm::hubs_ws_tc:  // New enum value
+#ifdef USE_FAISS
+            bitonic_hubs_ws::C_and_Q_TensorCore(N, dV, Q, dQ, k,
+                                thrust::raw_pointer_cast(d_knn.data()),
+                                thrust::raw_pointer_cast(d_distances.data()));
+#else
+            std::cerr << "Requested algorithm HubsWS_TC but compiled without FAISS support" << std::endl;
             assert( false && "Compiled without faiss support.");
 #endif
             break;

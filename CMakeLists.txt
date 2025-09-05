@@ -21,18 +21,16 @@ if(LINK_FAISS)
     	    ${CMAKE_SOURCE_DIR}/external/faiss/build/faiss/libfaiss.a)
 endif()
 
-# 在 target_compile_options 中添加优化标志
 target_compile_options(linear-scans PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
     -arch=sm_86;
     -std=c++20;
     -Xptxas="-v";
-    -O3;                    # 新增
-    -use_fast_math;        # 新增
+    -O3;                    
+    -use_fast_math;
+    --extended-lambda;
 >)
 
-# 总是链接 cuBLAS（不仅仅在 FAISS 时）
 find_library(CUBLAS_LIBRARIES cublas REQUIRED)
 target_link_libraries(linear-scans PRIVATE ${CUBLAS_LIBRARIES})
 
-# !! 添加 Tensor Core 支持定义
 target_compile_definitions(linear-scans PRIVATE TENSOR_CORE_AVAILABLE)

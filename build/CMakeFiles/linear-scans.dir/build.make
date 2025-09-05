@@ -53,10 +53,10 @@ RM = /root/miniconda3/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /root/autodl-tmp/Clover-CodeRelease
+CMAKE_SOURCE_DIR = /root/autodl-tmp/Clover-CodeRelease-main
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /root/autodl-tmp/Clover-CodeRelease/build
+CMAKE_BINARY_DIR = /root/autodl-tmp/Clover-CodeRelease-main/build
 
 # Include any dependencies generated for this target.
 include CMakeFiles/linear-scans.dir/depend.make
@@ -74,10 +74,10 @@ CMakeFiles/linear-scans.dir/codegen:
 
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o: CMakeFiles/linear-scans.dir/flags.make
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o: CMakeFiles/linear-scans.dir/includes_CUDA.rsp
-CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o: /root/autodl-tmp/Clover-CodeRelease/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu
+CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o: /root/autodl-tmp/Clover-CodeRelease-main/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o: CMakeFiles/linear-scans.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/root/autodl-tmp/Clover-CodeRelease/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CUDA object CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o"
-	/usr/local/cuda-12.8/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o -MF CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o.d -x cu -c /root/autodl-tmp/Clover-CodeRelease/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu -o CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/root/autodl-tmp/Clover-CodeRelease-main/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CUDA object CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o"
+	/usr/local/cuda-12.8/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o -MF CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o.d -x cu -c /root/autodl-tmp/Clover-CodeRelease-main/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu -o CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.o
 
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/dev_memory.cu.i"
@@ -89,10 +89,10 @@ CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non
 
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o: CMakeFiles/linear-scans.dir/flags.make
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o: CMakeFiles/linear-scans.dir/includes_CUDA.rsp
-CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o: /root/autodl-tmp/Clover-CodeRelease/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu
+CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o: /root/autodl-tmp/Clover-CodeRelease-main/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o: CMakeFiles/linear-scans.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/root/autodl-tmp/Clover-CodeRelease/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CUDA object CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o"
-	/usr/local/cuda-12.8/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o -MF CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o.d -x cu -c /root/autodl-tmp/Clover-CodeRelease/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu -o CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/root/autodl-tmp/Clover-CodeRelease-main/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CUDA object CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o"
+	/usr/local/cuda-12.8/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o -MF CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o.d -x cu -c /root/autodl-tmp/Clover-CodeRelease-main/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu -o CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.o
 
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/gpu_tree.cu.i"
@@ -104,10 +104,10 @@ CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non
 
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o: CMakeFiles/linear-scans.dir/flags.make
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o: CMakeFiles/linear-scans.dir/includes_CUDA.rsp
-CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o: /root/autodl-tmp/Clover-CodeRelease/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu
+CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o: /root/autodl-tmp/Clover-CodeRelease-main/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o: CMakeFiles/linear-scans.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/root/autodl-tmp/Clover-CodeRelease/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CUDA object CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o"
-	/usr/local/cuda-12.8/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o -MF CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o.d -x cu -c /root/autodl-tmp/Clover-CodeRelease/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu -o CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/root/autodl-tmp/Clover-CodeRelease-main/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CUDA object CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o"
+	/usr/local/cuda-12.8/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o -MF CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o.d -x cu -c /root/autodl-tmp/Clover-CodeRelease-main/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu -o CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.o
 
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kdtree.cu.i"
@@ -119,10 +119,10 @@ CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non
 
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o: CMakeFiles/linear-scans.dir/flags.make
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o: CMakeFiles/linear-scans.dir/includes_CUDA.rsp
-CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o: /root/autodl-tmp/Clover-CodeRelease/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu
+CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o: /root/autodl-tmp/Clover-CodeRelease-main/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o: CMakeFiles/linear-scans.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/root/autodl-tmp/Clover-CodeRelease/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CUDA object CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o"
-	/usr/local/cuda-12.8/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o -MF CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o.d -x cu -c /root/autodl-tmp/Clover-CodeRelease/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu -o CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/root/autodl-tmp/Clover-CodeRelease-main/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CUDA object CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o"
+	/usr/local/cuda-12.8/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o -MF CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o.d -x cu -c /root/autodl-tmp/Clover-CodeRelease-main/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu -o CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.o
 
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/kernel.cu.i"
@@ -134,10 +134,10 @@ CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non
 
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o: CMakeFiles/linear-scans.dir/flags.make
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o: CMakeFiles/linear-scans.dir/includes_CUDA.rsp
-CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o: /root/autodl-tmp/Clover-CodeRelease/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu
+CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o: /root/autodl-tmp/Clover-CodeRelease-main/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o: CMakeFiles/linear-scans.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/root/autodl-tmp/Clover-CodeRelease/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CUDA object CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o"
-	/usr/local/cuda-12.8/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o -MF CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o.d -x cu -c /root/autodl-tmp/Clover-CodeRelease/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu -o CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/root/autodl-tmp/Clover-CodeRelease-main/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CUDA object CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o"
+	/usr/local/cuda-12.8/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o -MF CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o.d -x cu -c /root/autodl-tmp/Clover-CodeRelease-main/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu -o CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o
 
 CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.i"
@@ -149,10 +149,10 @@ CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non
 
 CMakeFiles/linear-scans.dir/src/linear-scans.cu.o: CMakeFiles/linear-scans.dir/flags.make
 CMakeFiles/linear-scans.dir/src/linear-scans.cu.o: CMakeFiles/linear-scans.dir/includes_CUDA.rsp
-CMakeFiles/linear-scans.dir/src/linear-scans.cu.o: /root/autodl-tmp/Clover-CodeRelease/src/linear-scans.cu
+CMakeFiles/linear-scans.dir/src/linear-scans.cu.o: /root/autodl-tmp/Clover-CodeRelease-main/src/linear-scans.cu
 CMakeFiles/linear-scans.dir/src/linear-scans.cu.o: CMakeFiles/linear-scans.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/root/autodl-tmp/Clover-CodeRelease/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CUDA object CMakeFiles/linear-scans.dir/src/linear-scans.cu.o"
-	/usr/local/cuda-12.8/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/linear-scans.dir/src/linear-scans.cu.o -MF CMakeFiles/linear-scans.dir/src/linear-scans.cu.o.d -x cu -c /root/autodl-tmp/Clover-CodeRelease/src/linear-scans.cu -o CMakeFiles/linear-scans.dir/src/linear-scans.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/root/autodl-tmp/Clover-CodeRelease-main/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CUDA object CMakeFiles/linear-scans.dir/src/linear-scans.cu.o"
+	/usr/local/cuda-12.8/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/linear-scans.dir/src/linear-scans.cu.o -MF CMakeFiles/linear-scans.dir/src/linear-scans.cu.o.d -x cu -c /root/autodl-tmp/Clover-CodeRelease-main/src/linear-scans.cu -o CMakeFiles/linear-scans.dir/src/linear-scans.cu.o
 
 CMakeFiles/linear-scans.dir/src/linear-scans.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/linear-scans.dir/src/linear-scans.cu.i"
@@ -181,11 +181,14 @@ linear-scans: CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/
 linear-scans: CMakeFiles/linear-scans.dir/include/treelogy/GPU/knearestneighbor/kdtree/gpu_non_lockstep/nn.cu.o
 linear-scans: CMakeFiles/linear-scans.dir/src/linear-scans.cu.o
 linear-scans: CMakeFiles/linear-scans.dir/build.make
+linear-scans: /root/autodl-tmp/Clover-CodeRelease-main/external/faiss/build/faiss/libfaiss.a
 linear-scans: /usr/lib/x86_64-linux-gnu/libcublas.so
+linear-scans: /root/miniconda3/envs/clover_env/lib/libgomp.so
+linear-scans: /root/miniconda3/envs/clover_env/x86_64-conda-linux-gnu/sysroot/usr/lib/libpthread.a
 linear-scans: CMakeFiles/linear-scans.dir/linkLibs.rsp
 linear-scans: CMakeFiles/linear-scans.dir/objects1.rsp
 linear-scans: CMakeFiles/linear-scans.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/root/autodl-tmp/Clover-CodeRelease/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CUDA executable linear-scans"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/root/autodl-tmp/Clover-CodeRelease-main/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CUDA executable linear-scans"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/linear-scans.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
@@ -197,6 +200,6 @@ CMakeFiles/linear-scans.dir/clean:
 .PHONY : CMakeFiles/linear-scans.dir/clean
 
 CMakeFiles/linear-scans.dir/depend:
-	cd /root/autodl-tmp/Clover-CodeRelease/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /root/autodl-tmp/Clover-CodeRelease /root/autodl-tmp/Clover-CodeRelease /root/autodl-tmp/Clover-CodeRelease/build /root/autodl-tmp/Clover-CodeRelease/build /root/autodl-tmp/Clover-CodeRelease/build/CMakeFiles/linear-scans.dir/DependInfo.cmake "--color=$(COLOR)"
+	cd /root/autodl-tmp/Clover-CodeRelease-main/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /root/autodl-tmp/Clover-CodeRelease-main /root/autodl-tmp/Clover-CodeRelease-main /root/autodl-tmp/Clover-CodeRelease-main/build /root/autodl-tmp/Clover-CodeRelease-main/build /root/autodl-tmp/Clover-CodeRelease-main/build/CMakeFiles/linear-scans.dir/DependInfo.cmake "--color=$(COLOR)"
 .PHONY : CMakeFiles/linear-scans.dir/depend
 
