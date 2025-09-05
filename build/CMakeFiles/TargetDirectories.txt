@@ -1,3 +1,0 @@
-/root/autodl-tmp/Clover-CodeRelease-main/build/CMakeFiles/linear-scans.dir
-/root/autodl-tmp/Clover-CodeRelease-main/build/CMakeFiles/edit_cache.dir
-/root/autodl-tmp/Clover-CodeRelease-main/build/CMakeFiles/rebuild_cache.dir
