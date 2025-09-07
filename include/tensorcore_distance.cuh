@@ -7,29 +7,142 @@
 
 namespace bitonic_hubs_ws {
 
-/**
- * 关键发现：KNN的瓶颈不在距离计算，而在以下几个方面：
- * 1. 数据layout不适合Tensor Core（不是矩阵乘法密集型）
- * 2. 内存访问模式不连续
- * 3. hub分配和重新排序的开销巨大
- * 4. 小batch size导致Tensor Core利用率低
- * 
- * 真正的优化策略：
- * - 优化内存访问模式
- * - 减少不必要的数据移动
- * - 提高cache局部性
- * - 只在真正适合的场景使用Tensor Core
- */
+// 定义常量
+#ifndef H
+constexpr idx_t H = 2048;
+#endif
+
+#ifndef warp_size  
+constexpr idx_t warp_size = 32;
+#endif
+
+// ============================================================================
+// 辅助Kernels（必须在类定义之前）
+// ============================================================================
 
 /**
- * 核心问题分析：
- * 1. KNN算法本质是距离计算 + 排序，不是纯矩阵乘法
- * 2. Tensor Core优化FP16 GEMM，但距离计算后还需要sqrt和比较
- * 3. 数据重新排列的开销可能超过计算优化的收益
+ * 收集hub坐标到连续数组
  */
+__global__ void gather_hubs_kernel(float* temp_hubs, const float* points, 
+                                  const idx_t* dH, int num_hubs) {
+    int hub_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (hub_idx < num_hubs) {
+        idx_t point_idx = dH[hub_idx];
+        for (int d = 0; d < dim; d++) {
+            temp_hubs[hub_idx * dim + d] = points[point_idx * dim + d];
+        }
+    }
+}
 
 /**
- * 智能化的距离计算kernel - 针对KNN特点优化
+ * 基于计算距离找到最近的hub
+ */
+__global__ void find_nearest_hubs(const float* distances, idx_t* dH_assignments,
+                                 idx_t* hub_counts, int batch_size, int num_hubs,
+                                 int batch_offset) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (idx < batch_size) {
+        float minimal_dist = FLT_MAX;
+        idx_t assigned_H = num_hubs + 1;  
+        
+        // 找到所有hub中的最小距离
+        for (int h = 0; h < num_hubs; h++) {
+            float dist = sqrtf(distances[idx * num_hubs + h]);  
+            if (dist < minimal_dist) {
+                minimal_dist = dist;
+                assigned_H = h;
+            }
+        }
+        
+        // 分配点到最近的hub
+        int global_point_idx = batch_offset + idx;
+        dH_assignments[global_point_idx] = assigned_H;
+        atomicAdd(&hub_counts[assigned_H], 1);
+    }
+}
+
+// ============================================================================
+// 统一的距离计算接口和优化策略
+// ============================================================================
+
+/**
+ * 距离计算策略枚举
+ */
+enum class DistanceStrategy {
+    AUTO,           // 自动选择最优策略
+    CUDA_OPTIMIZED, // 优化的CUDA kernel
+    TENSOR_CORE,    // Tensor Core加速
+    FALLBACK        // 回退到基础实现
+};
+
+/**
+ * 距离计算配置结构
+ */
+struct DistanceConfig {
+    DistanceStrategy strategy = DistanceStrategy::AUTO;
+    bool use_shared_memory = true;
+    bool use_vectorization = true;
+    bool enable_tensor_cores = true;
+    size_t min_batch_for_tc = 10000;
+    size_t min_hubs_for_tc = 256;
+    size_t min_ops_for_tc = 20000000;
+};
+
+// ============================================================================
+// 核心距离计算Kernels
+// ============================================================================
+
+/**
+ * 基础距离计算kernel - 最稳定的实现
+ */
+template <class R>
+__global__ void Calculate_Distances_Basic(
+    idx_t b_id, idx_t b_size, idx_t n, 
+    idx_t const* dH, R *distances, 
+    R const* points, idx_t *hub_counts, 
+    idx_t *dH_assignments)
+{
+    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    const int idx = tid + b_id * b_size;
+    const int idx_within_b = tid;
+
+    if (idx >= n || idx_within_b >= b_size) return;
+
+    // 预加载查询点坐标
+    const R q_x = points[idx * dim + 0];
+    const R q_y = points[idx * dim + 1];
+    const R q_z = points[idx * dim + 2];
+
+    R minimal_dist = FLT_MAX;
+    idx_t assigned_H = H;
+
+    // 直接计算距离，不使用shared memory
+    for (idx_t h = 0; h < H; h++) {
+        const R h_x = points[dH[h] * dim + 0];
+        const R h_y = points[dH[h] * dim + 1];
+        const R h_z = points[dH[h] * dim + 2];
+        
+        const R dx = q_x - h_x;
+        const R dy = q_y - h_y;
+        const R dz = q_z - h_z;
+        const R dist = sqrtf(dx*dx + dy*dy + dz*dz);
+        
+        distances[h * b_size + idx_within_b] = dist;
+        
+        if (dist < minimal_dist) {
+            assigned_H = h;
+            minimal_dist = dist;
+        }
+    }
+
+    dH_assignments[idx] = assigned_H;
+    atomicAdd(&hub_counts[assigned_H], 1);
+}
+
+/**
+ * 优化的距离计算kernel - 使用shared memory和向量化
  */
 template <class R>
 __global__ void Calculate_Distances_Optimized(
@@ -38,7 +151,6 @@ __global__ void Calculate_Distances_Optimized(
     R const* points, idx_t *hub_counts, 
     idx_t *dH_assignments)
 {
-    // 使用更大的线程块和更好的内存合并
     const int tid = blockIdx.x * blockDim.x + threadIdx.x;
     const int idx = tid + b_id * b_size;
     const int idx_within_b = tid;
@@ -53,8 +165,8 @@ __global__ void Calculate_Distances_Optimized(
     R minimal_dist = FLT_MAX;
     idx_t assigned_H = H;
 
-    // 使用shared memory缓存hub坐标，提高重用性
-    __shared__ R shared_hubs[H * dim]; // 如果H太大，分块处理
+    // 使用shared memory缓存hub坐标
+    extern __shared__ R shared_hubs[];
     
     // 协作加载hub数据到shared memory
     for (int i = threadIdx.x; i < H * dim; i += blockDim.x) {
@@ -92,123 +204,14 @@ __global__ void Calculate_Distances_Optimized(
     atomicAdd(&hub_counts[assigned_H], 1);
 }
 
-/**
- * 针对大规模数据的Tensor Core混合优化
- * 只在真正有优势时使用Tensor Core
- */
-template <class R>
-__global__ void Calculate_Distances_Hybrid(
-    idx_t b_id, idx_t b_size, idx_t n, 
-    idx_t const* dH, R *distances, 
-    R const* points, idx_t *hub_counts, 
-    idx_t *dH_assignments,
-    bool use_tensorcore_path)
-{
-    if (use_tensorcore_path && b_size >= 50000 && H >= 1024) {
-        // 只对大规模数据使用复杂的Tensor Core路径
-        // 这里可以调用专门的Tensor Core kernel
-        // 但目前先用优化版本
-        Calculate_Distances_Optimized<R><<<gridDim, blockDim>>>(
-            b_id, b_size, n, dH, distances, points, hub_counts, dH_assignments);
-    } else {
-        // 对小规模数据使用优化的传统kernel
-        Calculate_Distances_Optimized<R><<<gridDim, blockDim>>>(
-            b_id, b_size, n, dH, distances, points, hub_counts, dH_assignments);
-    }
-}
-
-// 前向声明
-template <class R>
-__global__ void Calculate_Distances(idx_t b_id, idx_t b_size, idx_t n, 
-                                   idx_t const* dH, R *distances, 
-                                   R const* points, idx_t *hub_counts, 
-                                   idx_t *dH_assignments);
-
-// 定义常量（如果在其他地方未定义）
-#ifndef H
-constexpr idx_t H = 2048;
-#endif
-
-#ifndef warp_size  
-constexpr idx_t warp_size = 32;
-#endif
-
-/**
- * 设备/主机函数：检查Tensor Core支持
- */
-__device__ __host__ inline bool check_tensor_core_support() {
-    int device;
-    cudaGetDevice(&device);
-    
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, device);
-    
-    // Tensor Cores are available on compute capability 7.0+ (Volta and newer)
-    return (prop.major >= 7);
-}
-
-/**
- * 智能阈值判断：什么时候使用Tensor Core才有优势
- */
-inline bool should_use_tensor_cores(idx_t batch_size, idx_t num_hubs) {
-    const size_t min_batch_for_tc = 10000;  
-    const size_t min_hubs_for_tc = 512;     
-    const size_t min_ops_for_tc = 50000000; 
-    
-    size_t total_ops = batch_size * num_hubs * dim * 2; 
-    
-    return (batch_size >= min_batch_for_tc) && 
-           (num_hubs >= min_hubs_for_tc) && 
-           (total_ops >= min_ops_for_tc);
-}
-
-/**
- * Kernel：收集hub坐标到连续数组
- */
-__global__ void gather_hubs_kernel(float* temp_hubs, const float* points, 
-                                  const idx_t* dH, int num_hubs) {
-    int hub_idx = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    if (hub_idx < num_hubs) {
-        idx_t point_idx = dH[hub_idx];
-        for (int d = 0; d < dim; d++) {
-            temp_hubs[hub_idx * dim + d] = points[point_idx * dim + d];
-        }
-    }
-}
-
-/**
- * Kernel：基于计算距离找到最近的hub
- */
-__global__ void find_nearest_hubs(const float* distances, idx_t* dH_assignments,
-                                 idx_t* hub_counts, int batch_size, int num_hubs,
-                                 int batch_offset) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    if (idx < batch_size) {
-        float minimal_dist = FLT_MAX;
-        idx_t assigned_H = num_hubs + 1;  
-        
-        // 找到所有hub中的最小距离
-        for (int h = 0; h < num_hubs; h++) {
-            float dist = sqrtf(distances[idx * num_hubs + h]);  
-            if (dist < minimal_dist) {
-                minimal_dist = dist;
-                assigned_H = h;
-            }
-        }
-        
-        // 分配点到最近的hub
-        int global_point_idx = batch_offset + idx;
-        dH_assignments[global_point_idx] = assigned_H;
-        atomicAdd(&hub_counts[assigned_H], 1);
-    }
-}
+// ============================================================================
+// Tensor Core 距离计算
+// ============================================================================
 
 /**
  * 优化的Tensor Core距离计算管理器
  */
-class OptimizedTensorCoreManager {
+class TensorCoreDistanceManager {
 private:
     __half *d_points_fp16;
     __half *d_hubs_fp16; 
@@ -223,7 +226,7 @@ private:
     cublasHandle_t cublas_handle;
 
 public:
-    OptimizedTensorCoreManager(size_t batch_size, size_t H, cublasHandle_t handle) 
+    TensorCoreDistanceManager(size_t batch_size, size_t H, cublasHandle_t handle) 
         : max_batch_size(batch_size), num_hubs(H), cublas_handle(handle), 
           initialized(false), hubs_initialized(false) {
         
@@ -236,13 +239,13 @@ public:
             
             initialized = true;
         } catch (const std::exception& e) {
-            std::cerr << "Failed to initialize OptimizedTensorCoreManager: " << e.what() << std::endl;
+            std::cerr << "Failed to initialize TensorCoreDistanceManager: " << e.what() << std::endl;
             cleanup();
             throw;
         }
     }
     
-    ~OptimizedTensorCoreManager() {
+    ~TensorCoreDistanceManager() {
         cleanup();
     }
     
@@ -257,7 +260,7 @@ public:
     }
     
     /**
-     * 一次性初始化hub数据
+     * 初始化hub数据
      */
     void initialize_hubs(const float* points, const idx_t* dH) {
         if (hubs_initialized || !initialized) return;
@@ -285,7 +288,7 @@ public:
     }
     
     /**
-     * 优化的batch距离计算
+     * 使用Tensor Core计算batch距离
      */
     template<typename R>
     void calculate_batch_distances(
@@ -294,7 +297,7 @@ public:
         idx_t* hub_counts, idx_t* dH_assignments) {
         
         if (!initialized || !hubs_initialized) {
-            throw std::runtime_error("TensorCoreManager not properly initialized");
+            throw std::runtime_error("TensorCoreDistanceManager not properly initialized");
         }
         
         idx_t actual_batch_size = std::min(batch_size, n - batch_id * batch_size);
@@ -348,65 +351,142 @@ public:
     }
 };
 
+// ============================================================================
+// 辅助函数
+// ============================================================================
+
 /**
- * 改进的智能距离计算函数
+ * 检查Tensor Core支持
  */
-template <class R>
-void smart_distance_calculation_optimized(
-    idx_t batch_id, idx_t batch_size, idx_t n,
-    idx_t const* dH, float* distances, R const* points,
-    idx_t* hub_counts, idx_t* dH_assignments,
-    cublasHandle_t cublas_handle,
-    OptimizedTensorCoreManager* tc_manager = nullptr) {
+__device__ __host__ inline bool check_tensor_core_support() {
+    int device;
+    cudaGetDevice(&device);
     
-    static bool tensor_core_available = check_tensor_core_support();
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, device);
     
-    // 智能判断是否使用Tensor Core
-    bool use_tensor_cores = tensor_core_available && 
-                           should_use_tensor_cores(batch_size, H) &&
-                           (tc_manager != nullptr);
-    
-    if (use_tensor_cores) {
-        try {
-            tc_manager->calculate_batch_distances(
-                batch_id, batch_size, n, points, distances,
-                hub_counts, dH_assignments
-            );
-            return; // 成功使用Tensor Core
-        } catch (const std::exception& e) {
-            std::cerr << "Tensor Core path failed, falling back: " << e.what() << std::endl;
-            // 继续执行传统方法
-        }
-    }
-    
-    // 使用原始CUDA kernel
-    dim3 block_size(1024);
-    dim3 grid_size((batch_size + block_size.x - 1) / block_size.x);
-    
-    Calculate_Distances<<<grid_size, block_size>>>(
-        batch_id, batch_size, n, dH, distances, points, hub_counts, dH_assignments
-    );
-    CHECK_ERROR("Calculate_Distances");
+    return (prop.major >= 7);
 }
 
 /**
- * 主要的优化入口函数 - 替换原来的smart_distance_calculation
+ * 智能判断是否使用Tensor Core
+ */
+inline bool should_use_tensor_cores(idx_t batch_size, idx_t num_hubs, const DistanceConfig& config) {
+    if (!config.enable_tensor_cores) return false;
+    
+    size_t total_ops = batch_size * num_hubs * dim * 2; 
+    
+    return (batch_size >= config.min_batch_for_tc) && 
+           (num_hubs >= config.min_hubs_for_tc) && 
+           (total_ops >= config.min_ops_for_tc) &&
+           (batch_size * num_hubs >= 2000000);
+}
+
+/**
+ * 自动选择最优策略
+ */
+inline DistanceStrategy select_optimal_strategy(idx_t batch_size, idx_t num_hubs, const DistanceConfig& config) {
+    if (config.strategy != DistanceStrategy::AUTO) {
+        return config.strategy;
+    }
+    
+    if (should_use_tensor_cores(batch_size, num_hubs, config)) {
+        return DistanceStrategy::TENSOR_CORE;
+    } else if (batch_size >= 1000) {
+        return DistanceStrategy::CUDA_OPTIMIZED;
+    } else {
+        return DistanceStrategy::FALLBACK;
+    }
+}
+
+// ============================================================================
+// 统一的距离计算接口
+// ============================================================================
+
+/**
+ * 统一的距离计算函数 - 主要入口点
+ */
+template <class R>
+void calculate_distances_unified(
+    idx_t batch_id, idx_t batch_size, idx_t n,
+    idx_t const* dH, R *distances, R const* points,
+    idx_t* hub_counts, idx_t* dH_assignments,
+    cublasHandle_t cublas_handle,
+    TensorCoreDistanceManager* tc_manager = nullptr,
+    const DistanceConfig& config = DistanceConfig{}) {
+    
+    DistanceStrategy strategy = select_optimal_strategy(batch_size, H, config);
+    
+    switch (strategy) {
+        case DistanceStrategy::TENSOR_CORE:
+            if (tc_manager && check_tensor_core_support()) {
+                try {
+                    tc_manager->calculate_batch_distances(
+                        batch_id, batch_size, n, points, distances,
+                        hub_counts, dH_assignments
+                    );
+                    return;
+                } catch (const std::exception& e) {
+                    std::cerr << "Tensor Core failed, falling back: " << e.what() << std::endl;
+                    // 继续执行fallback
+                }
+            }
+            // 如果没有tc_manager或失败，继续到下一个case
+            
+        case DistanceStrategy::CUDA_OPTIMIZED:
+            {
+                dim3 block_size(1024);
+                dim3 grid_size((batch_size + block_size.x - 1) / block_size.x);
+                size_t shared_mem_size = H * dim * sizeof(R);
+                
+                Calculate_Distances_Optimized<<<grid_size, block_size, shared_mem_size>>>(
+                    batch_id, batch_size, n, dH, distances, points, hub_counts, dH_assignments
+                );
+                CHECK_ERROR("Calculate_Distances_Optimized");
+                return;
+            }
+            
+        case DistanceStrategy::FALLBACK:
+        default:
+            {
+                dim3 block_size(1024);
+                dim3 grid_size((batch_size + block_size.x - 1) / block_size.x);
+                
+                Calculate_Distances_Basic<<<grid_size, block_size>>>(
+                    batch_id, batch_size, n, dH, distances, points, hub_counts, dH_assignments
+                );
+                CHECK_ERROR("Calculate_Distances_Basic");
+                return;
+            }
+    }
+}
+
+// ============================================================================
+// 向后兼容的接口
+// ============================================================================
+
+/**
+ * 向后兼容的智能距离计算函数
  */
 template <class R>
 void smart_distance_calculation(
     idx_t batch_id, idx_t batch_size, idx_t n,
-    idx_t const* dH, float* distances, R const* points,
+    idx_t const* dH, R *distances, R const* points,
     idx_t* hub_counts, idx_t* dH_assignments,
-    cublasHandle_t cublas_handle) {
+    cublasHandle_t cublas_handle,
+    TensorCoreDistanceManager* tc_manager = nullptr) {
     
-    // 使用传统方法（为了保持兼容性）
-    dim3 block_size(1024);
-    dim3 grid_size((batch_size + block_size.x - 1) / block_size.x);
-    
-    Calculate_Distances<<<grid_size, block_size>>>(
-        batch_id, batch_size, n, dH, distances, points, hub_counts, dH_assignments
+    calculate_distances_unified(
+        batch_id, batch_size, n, dH, distances, points,
+        hub_counts, dH_assignments, cublas_handle, tc_manager
     );
-    CHECK_ERROR("Calculate_Distances");
 }
 
-} // namespace bitonic_hubs_ws
+// 前向声明，保持向后兼容
+template <class R>
+__global__ void Calculate_Distances(idx_t b_id, idx_t b_size, idx_t n, 
+                                   idx_t const* dH, R *distances, 
+                                   R const* points, idx_t *hub_counts, 
+                                   idx_t *dH_assignments);
+
+} // namespace bitonic_hubs_ws 
