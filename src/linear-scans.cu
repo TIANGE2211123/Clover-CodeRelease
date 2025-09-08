@@ -605,18 +605,13 @@ int main( int argc, char **argv )
     std::optional< Algorithm > const algorithm = parse_input( argc, argv );
     
     using real = float;
-
-    execute_knn<float, 1000, 3>(argc, argv);
-    execute_knn<float, 2000, 3>(argc, argv);
-    execute_knn<float, 5000, 3>(argc, argv);
-    execute_knn<float, 10000, 3>(argc, argv);
-    execute_knn<float, 20000, 3>(argc, argv);
     execute_knn<float, 50000, 3>(argc, argv);
-    execute_knn<float, 80000, 3>(argc, argv);
     execute_knn<float, 100000, 3>(argc, argv);
-    execute_knn<float, 150000, 3>(argc, argv);
+    //execute_knn<float, 150000, 3>(argc, argv);
     execute_knn<float, 200000, 3>(argc, argv);
-    execute_knn<float, 350000, 3>(argc, argv);
+    //execute_knn<float, 350000, 3>(argc, argv);
+    execute_knn<float, 300000, 3>(argc, argv);
+    execute_knn<float, 400000, 3>(argc, argv);
     execute_knn<float, 500000, 3>(argc, argv);
     execute_knn<float, 600000, 3>(argc, argv);
     execute_knn<float, 700000, 3>(argc, argv);
