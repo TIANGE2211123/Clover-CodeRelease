@@ -1,0 +1,150 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 3068 >>
+stream
+BT
+/F1 16 Tf
+1 0 0 1 50 760 Tm
+(CLOVER App Summary) Tj
+/F1 11 Tf
+1 0 0 1 50 745 Tm
+() Tj
+/F1 12 Tf
+1 0 0 1 50 732 Tm
+(What it is) Tj
+/F1 10 Tf
+1 0 0 1 50 717 Tm
+(- CLOVER is a GPU-native exact k-nearest-neighbor \(kNN\) research codebase accompanying the paper) Tj
+/F1 10 Tf
+1 0 0 1 50 704 Tm
+(  'CLOVER: A GPU-native, Spatio-graph-based Approach to Exact kNN'.) Tj
+/F1 10 Tf
+1 0 0 1 50 691 Tm
+(- It benchmarks CUDA-based kNN strategies \(linear-scan + spatio-graph variants\) via) Tj
+/F1 10 Tf
+1 0 0 1 50 678 Tm
+(  one executable: linear-scans.) Tj
+/F1 10 Tf
+1 0 0 1 50 665 Tm
+() Tj
+/F1 12 Tf
+1 0 0 1 50 652 Tm
+(Who it's for) Tj
+/F1 10 Tf
+1 0 0 1 50 637 Tm
+(- Primary persona: GPU systems/ML researchers and performance engineers evaluating) Tj
+/F1 10 Tf
+1 0 0 1 50 624 Tm
+(  exact kNN implementations and CUDA-kernel optimizations.) Tj
+/F1 10 Tf
+1 0 0 1 50 611 Tm
+() Tj
+/F1 12 Tf
+1 0 0 1 50 598 Tm
+(What it does) Tj
+/F1 10 Tf
+1 0 0 1 50 583 Tm
+(- Builds a CUDA/C++ executable \(linear-scans\) from src/*.cu and include/*.cuh.) Tj
+/F1 10 Tf
+1 0 0 1 50 570 Tm
+(- Supports CLI-selected algorithms: Bitonic, Warpwise, Hubs variants, FAISS variants,) Tj
+/F1 10 Tf
+1 0 0 1 50 557 Tm
+(  and Treelogy KD-tree.) Tj
+/F1 10 Tf
+1 0 0 1 50 544 Tm
+(- Runs synthetic experiments with fixed-seed random 3D data.) Tj
+/F1 10 Tf
+1 0 0 1 50 531 Tm
+(- Runs mesh experiments by scanning ../meshes and loading .txt point files.) Tj
+/F1 10 Tf
+1 0 0 1 50 518 Tm
+(- Copies points/queries to GPU, dispatches selected kernels, returns neighbors+distances.) Tj
+/F1 10 Tf
+1 0 0 1 50 505 Tm
+(- Prints timing tuples in release mode and can print outputs for inspection.) Tj
+/F1 10 Tf
+1 0 0 1 50 492 Tm
+(- Optionally enables FAISS-backed paths via build flag USE_FAISS/LINK_FAISS.) Tj
+/F1 10 Tf
+1 0 0 1 50 479 Tm
+() Tj
+/F1 12 Tf
+1 0 0 1 50 466 Tm
+(How it works \(architecture\)) Tj
+/F1 10 Tf
+1 0 0 1 50 451 Tm
+(- Build layer: CMake compiles CUDA sources, links cuBLAS, conditionally links) Tj
+/F1 10 Tf
+1 0 0 1 50 438 Tm
+(  FAISS/OpenMP.) Tj
+/F1 10 Tf
+1 0 0 1 50 425 Tm
+(- Orchestration: linear-scans.cu parses algorithm index, prepares data, and loops) Tj
+/F1 10 Tf
+1 0 0 1 50 412 Tm
+(  benchmark sizes.) Tj
+/F1 10 Tf
+1 0 0 1 50 399 Tm
+(- Data flow: host arrays/vectors -> cudaMemcpy to device -> algorithm kernel ->) Tj
+/F1 10 Tf
+1 0 0 1 50 386 Tm
+(  host vectors -> stdout.) Tj
+/F1 10 Tf
+1 0 0 1 50 373 Tm
+(- Algorithm layer: include/ provides bitonic, warpwise, hubs, FAISS wrappers,) Tj
+/F1 10 Tf
+1 0 0 1 50 360 Tm
+(  and Treelogy integration.) Tj
+/F1 10 Tf
+1 0 0 1 50 347 Tm
+(- External services/components: Not found in repo.) Tj
+/F1 10 Tf
+1 0 0 1 50 334 Tm
+() Tj
+/F1 12 Tf
+1 0 0 1 50 321 Tm
+(How to run \(minimal\)) Tj
+/F1 10 Tf
+1 0 0 1 50 306 Tm
+(1\) Install CUDA+GCC \(README cites CUDA 12.6, GCC 13.3 for local Linux\).) Tj
+/F1 10 Tf
+1 0 0 1 50 293 Tm
+(2\) mkdir build && cd build) Tj
+/F1 10 Tf
+1 0 0 1 50 280 Tm
+(3\) cmake -DCMAKE_BUILD_TYPE=Release ..) Tj
+/F1 10 Tf
+1 0 0 1 50 267 Tm
+(4\) make) Tj
+/F1 10 Tf
+1 0 0 1 50 254 Tm
+(5\) ./linear-scans 2  \(or another algorithm index\)) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+3431
+%%EOF
